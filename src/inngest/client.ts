@@ -14,6 +14,6 @@ type Events = {
 };
 
 export const inngest = new Inngest({
-  name: "My App",
+  name: "Clerk Onboarding POC",
   schemas: new EventSchemas().fromRecord<Events>(),
 });
