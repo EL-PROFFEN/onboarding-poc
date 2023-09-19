@@ -1,10 +1,11 @@
-import { OrganizationSwitcher, auth, currentUser } from "@clerk/nextjs";
+import { OrganizationSwitcher, currentUser } from "@clerk/nextjs";
 import { db } from "~/drizzle/db";
 
 // import { businessAdmin } from "~/drizzle/schema";
-import { member, organization } from "~/drizzle/schema";
+import { existingUser, organization } from "~/drizzle/schema";
 import { eq, inArray } from "drizzle-orm";
-import { User } from "@clerk/nextjs/server";
+import { InviteOrgMembers } from "./components/InviteOrgMembers";
+import { AddressForm } from "./components/AddressForm";
 
 export default async function OrgSelectionPage() {
   const user = await currentUser();
@@ -16,28 +17,22 @@ export default async function OrgSelectionPage() {
 
   const [m] = await db
     .select({
-      role: member.role,
+      role: existingUser.role,
+      clerkOrgId: organization.clerkOrgId,
     })
-    .from(member)
-    .where(inArray(member.email, emailAddresses))
-    .innerJoin(organization, eq(organization.orgNr, member.orgNr))
+    .from(existingUser)
+    .where(inArray(existingUser.email, emailAddresses))
+    .innerJoin(organization, eq(organization.subOrgNr, existingUser.orgNr))
     .limit(1);
   if (!m) return null;
-
   const isAdmin = m.role === "admin";
 
-  console.log(isAdmin);
-
   return (
-    <main className="flex flex-col items-center gap-8 w-full flex-1 p-20 text-center">
+    <main className="flex flex-col items-center gap-8 w-full flex-1 text-center">
       <h1 className="text-3xl font-bold">VELG BEDRIFT</h1>
       <OrganizationSwitcher hidePersonal createOrganizationMode="modal" />
+      {isAdmin && <InviteOrgMembers clerkOrgId={m.clerkOrgId} />}
+      {isAdmin && <AddressForm />}
     </main>
   );
 }
-
-const getPrimaryEmail = ({ emailAddresses, primaryEmailAddressId }: User) =>
-  emailAddresses.find(({ id }) => id === primaryEmailAddressId);
-
-const getOrgMembers = (orgNr: number) =>
-  db.select().from(member).where(eq(member.orgNr, orgNr));

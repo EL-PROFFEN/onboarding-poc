@@ -3,6 +3,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Navbar } from "./navbar";
+import { cn } from "~/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,7 +21,10 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body
-          className={`${inter.className} bg-slate-50 text-black min-h-screen flex flex-col`}
+          className={cn(
+            "bg-slate-50 text-black min-h-screen flex flex-col gap-8",
+            inter.className
+          )}
         >
           <Navbar />
           <div className="container flex-1 px-4">{children}</div>

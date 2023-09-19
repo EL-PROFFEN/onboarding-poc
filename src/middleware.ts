@@ -10,6 +10,8 @@ export default authMiddleware({
   afterAuth: async (auth, req, res) => {
     if (auth.orgId) return;
 
+    console.log(auth);
+
     if (!auth.userId && !auth.isPublicRoute)
       return redirectToSignIn({ returnBackUrl: req.url });
 

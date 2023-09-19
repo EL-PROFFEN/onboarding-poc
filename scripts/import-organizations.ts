@@ -2,9 +2,16 @@ import fs from "fs";
 import csv from "csv-parser";
 import clerk from "@clerk/clerk-sdk-node";
 import { db } from "~/drizzle/db";
-import { InsertOrganization, organization } from "~/drizzle/schema";
+import { address, orgNrValidation, organization } from "~/drizzle/schema";
+import { z } from "zod";
+import { getParentOrgDetails, getSubOrgDetails } from "./get-brr-org-info";
 
-type OrgRow = Omit<InsertOrganization, "clerkOrgId">;
+const orgRowSchema = z.object({
+  parentOrgNr: orgNrValidation,
+  orgNr: orgNrValidation,
+});
+
+type OrgRow = z.infer<typeof orgRowSchema>;
 
 const CREATED_BY = process.env.DEFAULT_ADMIN_USER_ID as string;
 
@@ -15,17 +22,24 @@ const getAllOrganizations = () =>
 
 const main = async () => {
   const allOrganizations = await getAllOrganizations();
-  console.log("All organizations", allOrganizations);
 
-  fs.createReadStream("./scripts/organizations.csv")
+  fs.createReadStream("data/organizations_minimal.csv")
     .pipe(csv())
-    .on("data", async ({ orgName, orgNr }: OrgRow) => {
+    .on("data", async ({ parentOrgNr, orgNr }: OrgRow) => {
+      const isSameOrg = parentOrgNr === orgNr;
+
+      console.log("Processing", orgNr, parentOrgNr);
+
       try {
         const existingOrg = allOrganizations.find(
           (org) => org.privateMetadata.orgNr === orgNr
         );
 
         if (existingOrg) return;
+
+        const { orgAddress, orgName } = isSameOrg
+          ? await getParentOrgDetails(parentOrgNr)
+          : await getSubOrgDetails(orgNr);
 
         const { id: clerkOrgId } = await clerk.organizations.createOrganization(
           {
@@ -37,11 +51,21 @@ const main = async () => {
           }
         );
 
-        console.log("Created organization", clerkOrgId, orgName, orgNr);
-
         await db.insert(organization).values({
           orgNr,
           orgName,
+          clerkOrgId,
+          parentOrgNr: isSameOrg ? null : parentOrgNr,
+        });
+
+        await db.insert(address).values(orgAddress).onDuplicateKeyUpdate({
+          set: orgAddress,
+        });
+
+        console.log("Created organization", {
+          orgName,
+          orgNr,
+          parentOrgNr,
           clerkOrgId,
         });
       } catch (error) {
